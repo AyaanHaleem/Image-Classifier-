@@ -1,0 +1,99 @@
+import argparse
+
+import warnings
+import time
+import numpy as np
+import matplotlib.pyplot as plt
+
+from PIL import Image
+import tensorflow as tf
+import tensorflow_hub as hub
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+
+import tensorflow_hub as hub
+import tensorflow_datasets as tfds
+import logging
+import json
+
+
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('checkpoint', action='store', default='checkpoint.pth')
+    parser.add_argument('--top_k', dest='top_k', default='3')
+    parser.add_argument('--filepath', dest='filepath', default='./test_images/')
+    parser.add_argument('--category_names', dest='category_names', default='label_map.json')
+    parser.add_argument('--gpu', action='store', default='gpu')
+    return parser.parse_args()
+
+def load_split_data():
+    
+    dataset = tfds.load('oxford_flowers102', shuffle_files=True, as_supervised = True, with_info = False)
+    train_set=dataset['train']
+    test_set=dataset['test']
+    val_set =dataset['validation']
+    num_training_examples = dataset_info.splits['train'].num_examples
+    return training_set, test_set, valid_set, training_set, num_training_examples
+    return training_set, test_set, valid_set, training_set, num_training_examples
+
+def normalize(image, label):
+
+    image = tf.cast(image, tf.float32) #from  unit8 to float32
+    image = tf.image.resize(image, (image_size, image_size))
+    image /= 255 
+    return image, label
+
+def batch_data(train_set, test_set, val_set, num_training_examples):
+    train_batches = training_set.cache().shuffle(num_training_examples//4).map(normalize(image, label)).batch(batch_size)
+    test_batches = test_set.cache().map(normalize).batch(batch_size)
+    val_batches = valid_set.cache().map(normalize).batch(batch_size)
+    return train_batches, test_batches, val_batches
+
+
+def map_data():
+    with open('label_map.json', 'r') as f:
+    class_names = json.load(f)
+    
+    
+model = "TrainedModel.h5"
+def load_model():
+    loaded_model = tf.keras.models.load_model(model, custom_objects={'KerasLayer':hub.KerasLayer}
+    return loaded_model
+                                              
+                                              
+def predict(image, model, top_k):
+    image = Image.open(image_path)
+    image = np.asarray(image)
+    image = tf.cast(image, tf.float32)
+    image = tf.image.resize(image, (image_size, image_size))
+    image /= 255
+    image = image.numpy().squeeze()
+    image = np.expand_dims(image, axis = 0)
+    ps = model.predict(image)[0] 
+    probabilities = np.sort(ps)[-top_k:len(ps)] 
+    prbabilities = probabilities.tolist() 
+    classes = np.argpartition(ps, -top_k)[-top_k:]
+    classes = classes.tolist() 
+    names = [class_names.get(str(i + 1)).capitalize() for i in (classes)] 
+    return probabilities, names
+                                              
+                                              
+def main():
+    args = parse_args()
+    gpu = args.gpu
+    model = load_checkpoint(args.checkpoint)
+    cat_to_name = load_cat_names(args.category_names)
+    img_path = args.filepath
+    probs, classes = predict(img_path, model, int(args.top_k), gpu)
+    labels = [cat_to_name[str(index)] for index in classes]
+    probability = probs
+    print('Selected File: ' + img_path)
+    print(labels)
+    print(probability)
+
+    a=0 
+    while a < len(labels):
+        print("{} with a prob of {}".format(labels[i], probability[i]))
+        a += 1 
+
+if __name__ == "__main__":
+    main()
